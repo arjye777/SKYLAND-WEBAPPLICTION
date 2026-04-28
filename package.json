@@ -10,6 +10,7 @@
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "bcryptjs": "^2.4.3",
-    "@seald-io/nedb": "^4.0.4"
+    "@seald-io/nedb": "^4.0.4",
+    "pdfkit": "^0.14.0"
   }
 }
