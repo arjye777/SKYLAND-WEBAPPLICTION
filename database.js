@@ -2,7 +2,7 @@ const Datastore = require('@seald-io/nedb');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-// Ensure db directory exists (if not, NeDB will create files)
+// Ensure db directory exists (NeDB will create the files)
 const dbDir = path.join(__dirname, 'db');
 const db = {};
 
@@ -13,24 +13,7 @@ db.orders = new Datastore({ filename: path.join(dbDir, 'orders.db'), autoload: t
 db.requests = new Datastore({ filename: path.join(dbDir, 'requests.db'), autoload: true });
 db.menu = new Datastore({ filename: path.join(dbDir, 'menu.db'), autoload: true });
 
-// Create default admin user (only if none exists)
-db.customers.findOne({ phone: 'admin' }, (err, admin) => {
-  if (!admin) {
-    bcrypt.hash('admin123', 10, (err, hash) => {
-      if (!err) {
-        db.customers.insert({
-          phone: 'admin',
-          name: 'Administrator',
-          password: hash,
-          isAdmin: true,
-          createdAt: new Date()
-        });
-      }
-    });
-  }
-});
-
-// Insert default menu items if menu collection is empty
+// Insert default menu items if empty
 db.menu.count({}, (err, count) => {
   if (count === 0) {
     const defaultMenu = [
