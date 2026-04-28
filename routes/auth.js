@@ -1,35 +1,55 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const db = require('../db/database');
 const router = express.Router();
+const db = require('../database');
 
-router.post('/register', (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.json({ ok: false, msg: 'All fields required' });
-  if (!email.toLowerCase().includes('@gmail.com')) return res.json({ ok: false, msg: 'Please use a Gmail address' });
-  if (password.length < 6) return res.json({ ok: false, msg: 'Password must be at least 6 characters' });
-  db.users.findOne({ email }, (err, doc) => {
-    if (doc) return res.json({ ok: false, msg: 'Email already registered' });
-    db.users.insert({ name, email, password: bcrypt.hashSync(password, 10), created_at: new Date().toLocaleString() }, (err, newDoc) => {
-      res.json({ ok: true, msg: 'Account created! Please sign in.' });
+// REGISTER (phone, name, password)
+router.post('/register', async (req, res) => {
+  const { phone, name, password } = req.body;
+  if (!phone || !name || !password) {
+    return res.json({ ok: false, msg: 'Phone, name and password required' });
+  }
+  const phoneRegex = /^[\+\d\s\-\(\)]{8,20}$/;
+  if (!phoneRegex.test(phone)) {
+    return res.json({ ok: false, msg: 'Invalid phone number format' });
+  }
+  db.customers.findOne({ phone }, async (err, existing) => {
+    if (err) return res.json({ ok: false, msg: 'Database error' });
+    if (existing) return res.json({ ok: false, msg: 'Phone number already registered' });
+    const hashed = await bcrypt.hash(password, 10);
+    const newUser = { phone, name, password: hashed, createdAt: new Date() };
+    db.customers.insert(newUser, (err, doc) => {
+      if (err) return res.json({ ok: false, msg: 'Registration failed' });
+      res.json({ ok: true, msg: 'Registration successful' });
     });
   });
 });
 
+// LOGIN (phone, password)
 router.post('/login', (req, res) => {
-  const { email, password } = req.body;
-  db.users.findOne({ email }, (err, user) => {
-    if (!user || !bcrypt.compareSync(password, user.password)) return res.json({ ok: false, msg: 'Invalid email or password' });
-    req.session.user = { id: user._id, name: user.name, email: user.email };
-    res.json({ ok: true, user: req.session.user });
+  const { phone, password } = req.body;
+  if (!phone || !password) return res.json({ ok: false, msg: 'Phone and password required' });
+  db.customers.findOne({ phone }, async (err, user) => {
+    if (err || !user) return res.json({ ok: false, msg: 'Invalid phone or password' });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.json({ ok: false, msg: 'Invalid phone or password' });
+    req.session.user = { id: user._id, name: user.name, phone: user.phone };
+    res.json({ ok: true, user: { id: user._id, name: user.name, phone: user.phone } });
   });
 });
 
-router.post('/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
+// LOGOUT
+router.post('/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ ok: true });
+});
 
+// GET CURRENT USER
 router.get('/me', (req, res) => {
-  if (req.session.user) res.json({ ok: true, user: req.session.user });
-  else res.json({ ok: false });
+  if (req.session.user) {
+    return res.json({ ok: true, user: req.session.user });
+  }
+  res.json({ ok: false });
 });
 
 module.exports = router;
