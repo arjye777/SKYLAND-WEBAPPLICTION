@@ -1,62 +1,121 @@
 const express = require('express');
-const db = require('../db/database');
 const router = express.Router();
+const db = require('../database');
 
-function auth(req, res, next) {
-  if (!req.session.user) return res.json({ ok: false, msg: 'Not logged in' });
-  next();
+// Middleware to check if user is logged in
+function isLoggedIn(req, res, next) {
+  if (req.session.user) return next();
+  res.json({ ok: false, msg: 'Please login first' });
 }
 
-router.post('/bookings', auth, (req, res) => {
-  const { room, price_per_night, checkin, checkout, guests, special_request } = req.body;
-  if (!room || !checkin || !checkout) return res.json({ ok: false, msg: 'Missing fields' });
-  const nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
-  if (nights <= 0) return res.json({ ok: false, msg: 'Invalid dates' });
-  const u = req.session.user;
-  const doc = { id: 'BK'+Date.now(), user_id: u.id, user_name: u.name, user_email: u.email, room, price_per_night: Number(price_per_night), total_price: Number(price_per_night)*nights, nights, checkin, checkout, guests: guests||1, special_request: special_request||'', status: 'Pending', created_at: new Date().toLocaleString() };
-  db.bookings.insert(doc, (err, newDoc) => {
-    if (err) return res.json({ ok: false, msg: 'Error saving booking' });
-    res.json({ ok: true, id: doc.id, msg: 'Booking submitted!' });
-  });
-});
-
-router.get('/bookings', auth, (req, res) => {
-  db.bookings.find({ user_id: req.session.user.id }).sort({ created_at: -1 }).exec((err, docs) => {
-    res.json({ ok: true, bookings: docs || [] });
-  });
-});
-
+// Get all menu items
 router.get('/menu', (req, res) => {
-  db.menu.find({ available: true }).sort({ category: 1, name: 1 }).exec((err, docs) => {
-    res.json({ ok: true, items: docs || [] });
+  db.menu.find({}, (err, items) => {
+    if (err) return res.json({ ok: false });
+    res.json({ ok: true, items });
   });
 });
 
-router.post('/orders', auth, (req, res) => {
+// Create a new booking
+router.post('/bookings', isLoggedIn, (req, res) => {
+  const { room, price_per_night, checkin, checkout, guests, special_request } = req.body;
+  if (!room || !price_per_night || !checkin || !checkout || !guests) {
+    return res.json({ ok: false, msg: 'Missing required fields' });
+  }
+  const nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
+  if (nights <= 0) return res.json({ ok: false, msg: 'Check-out must be after check-in' });
+  const total_price = price_per_night * nights;
+  const newBooking = {
+    customer_phone: req.session.user.phone,
+    customer_name: req.session.user.name,
+    room,
+    price_per_night,
+    checkin,
+    checkout,
+    guests: parseInt(guests),
+    special_request: special_request || '',
+    total_price,
+    status: 'Pending',
+    created_at: new Date().toISOString()
+  };
+  db.bookings.insert(newBooking, (err, doc) => {
+    if (err) return res.json({ ok: false, msg: 'Booking failed' });
+    res.json({ ok: true, msg: 'Booking confirmed!', booking: doc });
+  });
+});
+
+// Get user's bookings
+router.get('/bookings', isLoggedIn, (req, res) => {
+  db.bookings.find({ customer_phone: req.session.user.phone }, (err, bookings) => {
+    if (err) return res.json({ ok: false });
+    res.json({ ok: true, bookings });
+  });
+});
+
+// Place an order (restaurant)
+router.post('/orders', isLoggedIn, (req, res) => {
   const { item_name, quantity, location, note } = req.body;
-  if (!item_name) return res.json({ ok: false, msg: 'Select an item' });
-  const u = req.session.user;
-  const doc = { id: 'ORD'+Date.now(), user_id: u.id, user_name: u.name, item_name, quantity: quantity||1, location: location||'Room Delivery', note: note||'', status: 'Preparing', created_at: new Date().toLocaleString() };
-  db.orders.insert(doc, () => res.json({ ok: true, msg: 'Order placed! Estimated 20-30 minutes.' }));
-});
-
-router.get('/orders', auth, (req, res) => {
-  db.orders.find({ user_id: req.session.user.id }).sort({ created_at: -1 }).exec((err, docs) => {
-    res.json({ ok: true, orders: docs || [] });
+  if (!item_name || !quantity) {
+    return res.json({ ok: false, msg: 'Item and quantity required' });
+  }
+  // Find item price from menu
+  db.menu.findOne({ name: item_name }, (err, item) => {
+    if (err || !item) {
+      return res.json({ ok: false, msg: 'Item not found' });
+    }
+    const total_price = item.price * parseInt(quantity);
+    const newOrder = {
+      customer_phone: req.session.user.phone,
+      customer_name: req.session.user.name,
+      item_name,
+      quantity: parseInt(quantity),
+      location: location || 'Room Delivery',
+      note: note || '',
+      total_price,
+      status: 'Pending',
+      created_at: new Date().toISOString()
+    };
+    db.orders.insert(newOrder, (err, doc) => {
+      if (err) return res.json({ ok: false, msg: 'Order failed' });
+      res.json({ ok: true, msg: 'Order placed successfully!' });
+    });
   });
 });
 
-router.post('/requests', auth, (req, res) => {
-  const { type, detail } = req.body;
-  if (!detail || !detail.trim()) return res.json({ ok: false, msg: 'Please describe your request' });
-  const u = req.session.user;
-  const doc = { id: 'REQ'+Date.now(), user_id: u.id, user_name: u.name, type: type||'Other', detail, status: 'Pending', admin_note: '', created_at: new Date().toLocaleString() };
-  db.requests.insert(doc, () => res.json({ ok: true, msg: 'Request submitted!' }));
+// Get user's orders
+router.get('/orders', isLoggedIn, (req, res) => {
+  db.orders.find({ customer_phone: req.session.user.phone }, (err, orders) => {
+    if (err) return res.json({ ok: false });
+    res.json({ ok: true, orders });
+  });
 });
 
-router.get('/requests', auth, (req, res) => {
-  db.requests.find({ user_id: req.session.user.id }).sort({ created_at: -1 }).exec((err, docs) => {
-    res.json({ ok: true, requests: docs || [] });
+// Submit a special request
+router.post('/requests', isLoggedIn, (req, res) => {
+  const { type, detail } = req.body;
+  if (!type || !detail) {
+    return res.json({ ok: false, msg: 'Request type and details required' });
+  }
+  const newRequest = {
+    customer_phone: req.session.user.phone,
+    customer_name: req.session.user.name,
+    type,
+    detail,
+    status: 'Pending',
+    admin_note: '',
+    created_at: new Date().toISOString()
+  };
+  db.requests.insert(newRequest, (err, doc) => {
+    if (err) return res.json({ ok: false, msg: 'Failed to submit request' });
+    res.json({ ok: true, msg: 'Request submitted' });
+  });
+});
+
+// Get user's requests
+router.get('/requests', isLoggedIn, (req, res) => {
+  db.requests.find({ customer_phone: req.session.user.phone }, (err, requests) => {
+    if (err) return res.json({ ok: false });
+    res.json({ ok: true, requests });
   });
 });
 
