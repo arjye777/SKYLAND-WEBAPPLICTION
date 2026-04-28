@@ -1,0 +1,209 @@
+<!-- CHATBOT IMPLEMENTATION -->
+<button class="chat-btn" id="chat-btn" onclick="toggleChat()" title="Chat with us">💬</button>
+<div class="chat-win" id="chatbot">
+  <div class="chat-hd">
+    <div>
+      <h4>🤖 Skyland Assistant</h4>
+      <span>● Online 24/7</span>
+    </div>
+    <button onclick="toggleChat()" style="background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:0">✕</button>
+  </div>
+  <div class="chat-msgs" id="chat-msgs">
+    <div class="msg bot">Hello! 👋 Welcome to <b>Skyland Hotel</b>!<br><br>I'm your AI assistant. Ask me about:<br>• 🛏️ Room bookings & pricing<br>• 🍽️ Restaurant & dining<br>• 💆 Spa & wellness<br>• 🏊 Facilities & amenities<br>• 📝 Special requests<br>• And more!</div>
+  </div>
+  <div class="chat-inp">
+    <input type="text" id="chat-in" placeholder="Ask me anything..." onkeydown="if(event.key==='Enter'){sendChat();event.preventDefault()}">
+    <button onclick="sendChat()" style="background:var(--gold);border:none;border-radius:10px;padding:10px 16px;cursor:pointer;font-size:1.1rem;color:var(--dark);font-weight:bold">➤</button>
+  </div>
+</div>
+
+<script>
+// ============= ENHANCED CHATBOT FUNCTIONALITY =============
+
+let chatHistory = [];
+let chatOpen = false;
+
+// Initialize chat on page load
+document.addEventListener('DOMContentLoaded', () => {
+  loadChatHistory();
+  setupChatEventListeners();
+});
+
+// Setup chat input event listener
+function setupChatEventListeners() {
+  const chatInput = document.getElementById('chat-in');
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+  }
+}
+
+// Toggle chat window
+function toggleChat() {
+  const chatWin = document.getElementById('chatbot');
+  chatOpen = !chatOpen;
+  if (chatOpen) {
+    chatWin.classList.add('open');
+    document.getElementById('chat-in').focus();
+  } else {
+    chatWin.classList.remove('open');
+  }
+}
+
+// Send chat message to backend
+async function sendChat() {
+  const input = document.getElementById('chat-in');
+  const message = input.value.trim();
+  
+  if (!message) return;
+  
+  // Add user message to chat immediately (optimistic update)
+  addMessage(message, 'user');
+  input.value = '';
+  
+  // Show typing indicator
+  showTypingIndicator();
+  
+  try {
+    // Send to backend chatbot API
+    const response = await fetch('/api/chatbot/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    
+    const result = await response.json();
+    
+    // Remove typing indicator
+    removeTypingIndicator();
+    
+    if (result.ok) {
+      // Add bot response with slight delay for natural feel
+      setTimeout(() => {
+        addMessage(result.reply, 'bot');
+        saveChatHistory();
+      }, 300);
+    } else {
+      addMessage('Sorry, I encountered an error. Please try again. 🤖', 'bot');
+    }
+  } catch (error) {
+    console.error('Chat error:', error);
+    removeTypingIndicator();
+    addMessage('Connection error. Please check your internet and try again. 📡', 'bot');
+  }
+}
+
+// Add message to chat display
+function addMessage(text, type) {
+  const chatMsgs = document.getElementById('chat-msgs');
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'msg ' + type;
+  msgDiv.innerHTML = text; // Using innerHTML to support line breaks
+  
+  chatMsgs.appendChild(msgDiv);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  
+  // Save to history
+  chatHistory.push({ text, type, timestamp: new Date().toLocaleTimeString() });
+}
+
+// Show typing indicator
+function showTypingIndicator() {
+  const chatMsgs = document.getElementById('chat-msgs');
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'msg bot typing';
+  typingDiv.id = 'typing-indicator';
+  typingDiv.innerHTML = '<span></span><span></span><span></span>';
+  
+  chatMsgs.appendChild(typingDiv);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+}
+
+// Remove typing indicator
+function removeTypingIndicator() {
+  const typingDiv = document.getElementById('typing-indicator');
+  if (typingDiv) typingDiv.remove();
+}
+
+// Save chat history to local storage
+function saveChatHistory() {
+  localStorage.setItem('skylandChatHistory', JSON.stringify(chatHistory));
+}
+
+// Load chat history from local storage
+function loadChatHistory() {
+  const saved = localStorage.getItem('skylandChatHistory');
+  if (saved) {
+    try {
+      const history = JSON.parse(saved);
+      chatHistory = history;
+      // Display saved messages
+      const chatMsgs = document.getElementById('chat-msgs');
+      if (chatMsgs && history.length > 0) {
+        // Clear default greeting
+        chatMsgs.innerHTML = '';
+        history.forEach(msg => {
+          const msgDiv = document.createElement('div');
+          msgDiv.className = 'msg ' + msg.type;
+          msgDiv.innerHTML = msg.text;
+          chatMsgs.appendChild(msgDiv);
+        });
+      }
+    } catch (e) {
+      console.error('Error loading chat history:', e);
+    }
+  }
+}
+
+// Clear chat history
+function clearChatHistory() {
+  chatHistory = [];
+  localStorage.removeItem('skylandChatHistory');
+  const chatMsgs = document.getElementById('chat-msgs');
+  if (chatMsgs) {
+    chatMsgs.innerHTML = '<div class="msg bot">Hello! 👋 Chat cleared. How can I help you?</div>';
+  }
+}
+
+// Add to window for access from HTML
+window.sendChat = sendChat;
+window.toggleChat = toggleChat;
+window.clearChatHistory = clearChatHistory;
+
+// Add typing animation CSS
+const style = document.createElement('style');
+style.textContent = `
+  .msg.typing {
+    display: flex !important;
+    gap: 4px;
+    align-items: center;
+    height: 20px;
+  }
+  .msg.typing span {
+    width: 8px;
+    height: 8px;
+    background: var(--gold);
+    border-radius: 50%;
+    animation: bounce 1.4s infinite;
+  }
+  .msg.typing span:nth-child(1) {
+    animation-delay: 0s;
+  }
+  .msg.typing span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .msg.typing span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+    40% { transform: translateY(-10px); opacity: 1; }
+  }
+`;
+document.head.appendChild(style);
+
+</script>
