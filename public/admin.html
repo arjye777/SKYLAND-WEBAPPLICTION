@@ -222,7 +222,7 @@ footer {
       <button class="btn btn-primary small" onclick="loadBookings()">Filter</button>
       <button class="btn btn-outline small" onclick="exportCSV()">Export CSV</button>
     </div>
-    <div style="overflow-x: auto;"><table id="bookings-table"><thead><tr><th>ID</th><th>Customer</th><th>Room</th><th>Bed</th><th>Check-in</th><th>Check-out</th><th>Add-ons</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
+    <div style="overflow-x: auto;"><table id="bookings-table"><thead><tr><th>ID</th><th>Guest Name</th><th>Room</th><th>Bed</th><th>Check-in</th><th>Check-out</th><th>Add-ons</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <!-- MENU MANAGEMENT -->
@@ -307,7 +307,7 @@ async function loadStats() {
     <div class="stat-card"><div class="stat-number">${stats.active_bookings||0}</div><div class="stat-label">Active/Confirmed</div></div>
     <div class="stat-card"><div class="stat-number">${stats.total_customers||0}</div><div class="stat-label">Customers</div></div>
   `;
-  // Revenue chart (last 7 days)
+  // Revenue chart
   const revData = await api('GET','/api/admin/analytics/daily-revenue');
   if(revData.ok && revenueChart) revenueChart.destroy();
   const ctx = document.getElementById('revenueChart').getContext('2d');
@@ -315,7 +315,7 @@ async function loadStats() {
     type: 'line',
     data: { labels: revData.dates || [], datasets: [{ label: 'Revenue (₱)', data: revData.revenues || [], borderColor: '#0a2f6c', tension: 0.3 }] }
   });
-  // Room type bookings
+  // Room type chart
   const roomData = await api('GET','/api/admin/analytics/room-breakdown');
   if(roomData.ok && roomTypeChart) roomTypeChart.destroy();
   const ctx2 = document.getElementById('roomTypeChart').getContext('2d');
@@ -335,23 +335,48 @@ async function loadBookings() {
   if(status) url += `status=${status}`;
   const r = await api('GET', url);
   const tbody = document.querySelector('#bookings-table tbody');
-  if(!r.bookings) { tbody.innerHTML = '<tr><td colspan="10">No bookings</td></tr>'; return; }
+  if(!r.bookings || !r.bookings.length) { tbody.innerHTML = '<tr><td colspan="10">No bookings</td></tr>'; return; }
   tbody.innerHTML = r.bookings.map(b => `
     <tr>
-      <td>${b.id?.slice(-6)}</td><td>${b.customer_name || '—'}</td><td>${b.room}</td><td>${b.bed_type || 'Twin/Double'}</td>
-      <td>${b.checkin}</td><td>${b.checkout}</td>
+      <td>${b._id?.slice(-6)}</td>
+      <td>${b.customer_name || '—'}</td>
+      <td>${b.room}</td>
+      <td>${b.bed_type || 'Twin/Double'}</td>
+      <td>${b.checkin}</td>
+      <td>${b.checkout}</td>
       <td>${(b.fridge_requested?'🧊 Fridge ':'')} ${(b.extra_bed_requested?'🛏️ Extra Bed':'')}</td>
       <td>₱${Number(b.total_price).toLocaleString()}</td>
-      <td><select onchange="updateBookingStatus('${b.id}', this.value)" class="status-badge status-${b.status?.toLowerCase()}"><option ${b.status==='Confirmed'?'selected':''}>Confirmed</option><option ${b.status==='Pending'?'selected':''}>Pending</option><option ${b.status==='Cancelled'?'selected':''}>Cancelled</option></select></td>
-      <td><button class="btn btn-outline small" onclick="viewBookingDetails('${b.id}')">View</button></td>
+      <td>
+        <select onchange="updateBookingStatus('${b._id}', this.value)" class="status-badge">
+          <option value="Pending" ${b.status==='Pending'?'selected':''}>Pending</option>
+          <option value="Confirmed" ${b.status==='Confirmed'?'selected':''}>Confirmed</option>
+          <option value="Cancelled" ${b.status==='Cancelled'?'selected':''}>Cancelled</option>
+        </select>
+      </td>
+      <td><button class="btn btn-outline small" onclick="viewBookingDetails('${b._id}')">View</button></td>
     </tr>
   `).join('');
 }
+
+// UPDATE BOOKING STATUS FUNCTION
 async function updateBookingStatus(id, newStatus) {
-  await api('PUT','/api/admin/bookings/'+id, {status: newStatus});
-  loadBookings(); loadStats();
+  const res = await api('PUT', `/api/admin/bookings/${id}`, { status: newStatus });
+  if (res.ok) {
+    toast('Status updated successfully');
+    loadBookings();
+    loadStats(); // refresh stats
+  } else {
+    alert('Failed to update status');
+  }
 }
-async function viewBookingDetails(id) { alert(`Booking details:\nID: ${id}\nUse admin panel to edit.`); }
+
+function toast(msg) {
+  alert(msg); // simple alert, can enhance later
+}
+
+async function viewBookingDetails(id) {
+  alert(`Booking ID: ${id}\nView details in console or implement modal.`);
+}
 
 async function loadMenu() {
   const r = await api('GET','/api/menu');
@@ -359,7 +384,10 @@ async function loadMenu() {
   if(!r.items) return;
   tbody.innerHTML = r.items.map(item => `
     <tr>
-      <td>${item.icon||'🍽️'} ${item.name}</td><td>${item.category}</td><td>₱${item.price}</td><td>${item.description}</td>
+      <td>${item.icon||'🍽️'} ${item.name}</td>
+      <td>${item.category}</td>
+      <td>₱${item.price}</td>
+      <td>${item.description}</td>
       <td><button class="btn btn-outline small" onclick="editMenuItem('${item._id}')">Edit</button> <button class="btn btn-danger small" onclick="deleteMenuItem('${item._id}')">Delete</button></td>
     </tr>
   `).join('');
@@ -400,7 +428,9 @@ async function loadRequests() {
   const tbody = document.querySelector('#requests-table tbody');
   tbody.innerHTML = r.requests.map(req => `
     <tr>
-      <td>${req.customer_name||'Guest'}</td><td>${req.type}</td><td>${req.detail}</td>
+      <td>${req.customer_name||'Guest'}</td>
+      <td>${req.type}</td>
+      <td>${req.detail}</td>
       <td><span class="status-badge ${req.status==='Resolved'?'status-confirmed':'status-pending'}">${req.status}</span></td>
       <td><button class="btn btn-primary small" onclick="resolveRequest('${req._id}')">Resolve</button></td>
     </tr>
@@ -410,10 +440,10 @@ async function resolveRequest(id) { await api('PUT','/api/admin/requests/'+id, {
 
 function exportCSV() {
   const rows = document.querySelectorAll('#bookings-table tbody tr');
-  let csv = 'ID,Customer,Room,Bed,Check-in,Check-out,Add-ons,Total,Status\n';
+  let csv = 'ID,Guest Name,Room,Bed,Check-in,Check-out,Add-ons,Total,Status\n';
   rows.forEach(row => {
     const cols = row.querySelectorAll('td');
-    if(cols.length) csv += [...cols].slice(0,8).map(cell => cell.innerText).join(',') + '\n';
+    if(cols.length) csv += [...cols].slice(0,9).map(cell => cell.innerText).join(',') + '\n';
   });
   const blob = new Blob([csv], {type: 'text/csv'});
   const a = document.createElement('a');
@@ -421,7 +451,7 @@ function exportCSV() {
   a.download = 'bookings.csv';
   a.click();
 }
-window.onload = () => { /* check session */ };
+window.onload = () => { /* check session later */ };
 </script>
 </body>
 </html>
