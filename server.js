@@ -14,22 +14,20 @@ app.use(session({
   cookie: { maxAge: 86400000 } 
 }));
 
-// API Routes
+// Routes
 app.use('/api/auth',    require('./routes/auth'));
 app.use('/api',         require('./routes/customer'));
 app.use('/api/admin',   require('./routes/admin'));
 app.use('/api/chatbot', require('./routes/chatbot'));
 
-// Static Pages
+// Pages
 app.get('/',      (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 app.listen(PORT, () => {
-  console.log('\n  🏨 SKYLAND HOTEL SYSTEM');
-  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  🌐 Customer: http://localhost:' + PORT);
-  console.log('  👨‍💼 Admin:    http://localhost:' + PORT + '/admin');
-  console.log('  🔐 Default Login: admin / admin123');
-  console.log('  🤖 Chatbot: Enabled (24/7)');
-  console.log('  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+  console.log('\n  🏨 Skyland Hotel System');
+  console.log('  Customer: http://localhost:' + PORT);
+  console.log('  Admin:    http://localhost:' + PORT + '/admin');
+  console.log('  Chatbot API: http://localhost:' + PORT + '/api/chatbot');
+  console.log('  Login: admin / admin123\n');
 });
