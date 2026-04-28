@@ -1,35 +1,86 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const db = require('../db/database');
 const router = express.Router();
+const db = require('../database');
 
-router.post('/register', (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.json({ ok: false, msg: 'All fields required' });
-  if (!email.toLowerCase().includes('@gmail.com')) return res.json({ ok: false, msg: 'Please use a Gmail address' });
-  if (password.length < 6) return res.json({ ok: false, msg: 'Password must be at least 6 characters' });
-  db.users.findOne({ email }, (err, doc) => {
-    if (doc) return res.json({ ok: false, msg: 'Email already registered' });
-    db.users.insert({ name, email, password: bcrypt.hashSync(password, 10), created_at: new Date().toLocaleString() }, (err, newDoc) => {
-      res.json({ ok: true, msg: 'Account created! Please sign in.' });
+// Register with phone number
+router.post('/register', async (req, res) => {
+  const { phone, name, password } = req.body;
+  if (!phone || !name || !password) {
+    return res.json({ ok: false, msg: 'Phone, name, and password are required' });
+  }
+  
+  // Phone number format validation (basic)
+  const phoneRegex = /^[\+\d\s\-\(\)]{8,20}$/;
+  if (!phoneRegex.test(phone)) {
+    return res.json({ ok: false, msg: 'Invalid phone number format' });
+  }
+  
+  // Check if phone already exists
+  db.customers.findOne({ phone }, async (err, existing) => {
+    if (err) {
+      return res.json({ ok: false, msg: 'Database error' });
+    }
+    if (existing) {
+      return res.json({ ok: false, msg: 'Phone number already registered' });
+    }
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      phone,
+      name,
+      password: hashedPassword,
+      createdAt: new Date()
+    };
+    
+    db.customers.insert(newUser, (err, doc) => {
+      if (err) {
+        return res.json({ ok: false, msg: 'Failed to create user' });
+      }
+      res.json({ ok: true, msg: 'Registration successful' });
     });
   });
 });
 
+// Login with phone number
 router.post('/login', (req, res) => {
-  const { email, password } = req.body;
-  db.users.findOne({ email }, (err, user) => {
-    if (!user || !bcrypt.compareSync(password, user.password)) return res.json({ ok: false, msg: 'Invalid email or password' });
-    req.session.user = { id: user._id, name: user.name, email: user.email };
-    res.json({ ok: true, user: req.session.user });
+  const { phone, password } = req.body;
+  if (!phone || !password) {
+    return res.json({ ok: false, msg: 'Phone and password are required' });
+  }
+  
+  db.customers.findOne({ phone }, async (err, user) => {
+    if (err || !user) {
+      return res.json({ ok: false, msg: 'Invalid phone number or password' });
+    }
+    
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.json({ ok: false, msg: 'Invalid phone number or password' });
+    }
+    
+    req.session.user = {
+      id: user._id,
+      name: user.name,
+      phone: user.phone
+    };
+    
+    res.json({ ok: true, user: { name: user.name, phone: user.phone } });
   });
 });
 
-router.post('/logout', (req, res) => { req.session.destroy(); res.json({ ok: true }); });
-
+// Get current logged-in user
 router.get('/me', (req, res) => {
-  if (req.session.user) res.json({ ok: true, user: req.session.user });
-  else res.json({ ok: false });
+  if (req.session.user) {
+    return res.json({ ok: true, user: req.session.user });
+  }
+  res.json({ ok: false });
+});
+
+// Logout
+router.post('/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ ok: true });
 });
 
 module.exports = router;
