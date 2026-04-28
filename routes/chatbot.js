@@ -1,152 +1,180 @@
 const express = require('express');
+const db = require('../db/database');
 const router = express.Router();
 
-// Comprehensive Knowledge Base for Hotel Chatbot
+// Enhanced chatbot knowledge base with hotel-specific information
 const knowledgeBase = [
   {
     category: 'booking',
-    keywords: ['book', 'booking', 'reserve', 'reservation', 'room', 'stay', 'check in', 'check out', 'reserve room'],
+    keywords: ['book', 'booking', 'reserve', 'reservation', 'room', 'stay', 'check in', 'check out', 'how to book'],
     responses: [
-      '🛏️ Welcome to Skyland Hotel Booking!\n\nWe offer 4 room types:\n• Normal Room: ₱1,500/night\n• Suite Room: ₱3,500/night\n• Deluxe Room: ₱2,800/night\n• King\'s Room: ₱5,500/night\n\nStandard Check-in: 2:00 PM | Check-out: 12:00 PM\n\nWould you like to book now?',
-      'To make a booking:\n1. Click "Book Rooms" tab\n2. Select your room type\n3. Choose check-in & check-out dates\n4. Add special requests (optional)\n5. Complete payment\n\nBooking takes just 2 minutes!',
-      'Need help with your booking? I can assist with:\n✓ Room availability\n✓ Pricing information\n✓ Special requests\n✓ Early/late checkout options'
+      'I can help you with bookings! 🛏️ Visit the "Book Rooms" section to reserve your stay. We offer:\n• Normal Room — ₱1,500/night\n• Suite Room — ₱3,500/night\n• Deluxe Room — ₱2,800/night\n• King\'s Room — ₱5,500/night',
+      'Ready to book? Click on any room and select your check-in and check-out dates. Our booking process takes less than 2 minutes!',
+      'Special requests? You can add any special requests during booking (early arrival, late checkout, extra beds, etc.)'
     ]
   },
   {
     category: 'menu',
-    keywords: ['menu', 'food', 'order', 'restaurant', 'eat', 'dining', 'breakfast', 'lunch', 'dinner', 'cafe'],
+    keywords: ['menu', 'food', 'order', 'restaurant', 'eat', 'dining', 'breakfast', 'lunch', 'dinner', 'food order'],
     responses: [
-      '🍽️ Skyland Mini Restaurant\n\nOperating Hours: 6AM - 10PM Daily\n\nMenu Highlights:\n✓ Filipino Cuisine\n✓ International Dishes\n✓ Desserts & Pastries\n✓ Beverages & Juices\n✓ Healthy Options\n\nOrder via "Restaurant" tab or call Room Service!',
-      'Room service available 24/7! 🚚\n\nDelivery options:\n• Room Delivery\n• Dining Hall\n• Poolside Service\n• To-go Orders\n\nSpecial dietary needs? We can accommodate!',
-      'Our Chef specializes in:\n🍲 Traditional Filipino dishes\n🍝 Italian cuisine\n🥗 Healthy & vegetarian options\n🍰 Homemade desserts\n☕ Premium beverages'
+      '🍽️ Our Skyland Mini Restaurant is open 6AM–10PM daily! We offer:\n• Filipino Favorites\n• International Cuisine\n• Desserts & Beverages\nOrder via the Restaurant tab — we deliver to your room, dining hall, or poolside.',
+      'Craving something specific? Browse our full menu in the Restaurant section. We can accommodate most dietary preferences!',
+      'Room service available! 24/7 delivery to your accommodation. Special instructions? We\'ll follow them exactly!'
     ]
   },
   {
     category: 'pricing',
-    keywords: ['price', 'cost', 'rate', 'how much', 'fee', 'charge', 'payment', 'rupees', '₱', 'peso'],
+    keywords: ['price', 'cost', 'rate', 'how much', 'fee', 'charge', 'payment', 'expensive', 'afford'],
     responses: [
-      '💰 Skyland Hotel Pricing:\n\n🛏️ Room Rates (per night):\n• Normal Room: ₱1,500\n• Suite Room: ₱3,500\n• Deluxe Room: ₱2,800\n• King\'s Room: ₱5,500\n\n✓ All rates include WiFi & breakfast!\n✓ Early bird discount: 15% off (book 30 days ahead)',
-      'Payment Methods Accepted:\n💳 Visa & Mastercard\n📱 GCash & PayMaya\n💵 Cash at check-in\n🏦 Bank Transfer\n\nSecure & encrypted transactions guaranteed!',
-      'Additional Service Charges:\n🅿️ Parking: FREE\n🛎️ Concierge: FREE\n🏊 Pool: FREE\n📶 WiFi: FREE\n💆 Spa Services: Starting at ₱1,000'
+      '💰 Skyland Pricing:\n🛏️ Normal Room: ₱1,500/night\n🌟 Suite Room: ₱3,500/night\n👑 Deluxe Room: ₱2,800/night\n🏰 King\'s Room: ₱5,500/night\n\nAll rates include complimentary WiFi & breakfast!',
+      'We accept Visa, Mastercard, GCash, PayMaya & cash. Payment is processed at check-in.',
+      'Early bird discounts available! Book 30 days in advance for 15% off.'
     ]
   },
   {
     category: 'checkin_checkout',
     keywords: ['check in', 'check out', 'checkin', 'checkout', 'arrival', 'departure', 'early', 'late', 'time'],
     responses: [
-      '⏰ Check-in & Check-out Times:\n\n✅ Standard Check-in: 2:00 PM\n✅ Standard Check-out: 12:00 PM (noon)\n\nSpecial Arrangements:\n🔑 Early Check-in: Available (₱500 fee)\n🔓 Late Checkout: Until 6 PM (₱800)\n📅 Full Day Extension: ₱2,500\n\nSubmit requests in the "Requests" tab!',
-      'Early Arrival Planning:\n✓ Submit early check-in request 48 hours in advance\n✓ Subject to room availability\n✓ ₱500 convenience fee applies\n✓ Baggage storage available for free\n\nRequest now via Requests tab!',
-      'Late Checkout Options:\n⏱️ Until 6 PM: ₱800\n🌙 Until midnight: ₱1,500\n🌅 Full next day: ₱2,500\n\nBook in advance for guaranteed availability!'
+      '✅ Standard Times:\n🔑 Check-in: 2:00 PM\n🔓 Check-out: 12:00 PM (noon)\n\nNeed early check-in or late checkout? Submit a request in the Requests tab!',
+      'Early arrival? We can arrange early check-in subject to availability (₱500 fee applies).',
+      'Staying longer? Late checkout until 6 PM is available (₱800 charge) or full-day extension (₱2,500).'
     ]
   },
   {
     category: 'facilities',
-    keywords: ['pool', 'spa', 'gym', 'facilities', 'amenities', 'parking', 'wifi', 'internet', 'concierge', 'business center'],
+    keywords: ['pool', 'spa', 'gym', 'facilities', 'amenities', 'parking', 'wifi', 'internet', 'concierge', 'what\'s available'],
     responses: [
-      '🏨 Skyland Hotel Amenities:\n\n🏊 Infinity Pool (10th floor, 6AM-9PM)\n💆 Spa & Wellness Center (9AM-8PM)\n🏋️ 24/7 Fitness Center\n🅿️ Free Underground Parking\n📶 Free High-Speed WiFi\n🛎️ 24/7 Concierge Service\n🍽️ Restaurant & Lounge\n💼 Business Center\n🎰 Event Spaces Available',
-      'Premium Facilities Included:\n✓ Complimentary WiFi throughout hotel\n✓ Free parking for all guests\n✓ 24/7 concierge assistance\n✓ Express laundry service (same-day)\n✓ Airport transfers available\n✓ Tour desk for city tours',
-      'Exclusive King\'s Room Perks:\n👑 Private infinity pool access\n🛎️ Personal butler service\n🍾 Complimentary welcome drink\n📞 Priority concierge\n✨ Room upgrade guarantee'
+      '🏨 Skyland Hotel Amenities:\n🏊 Infinity Pool (10th floor, 6AM–9PM)\n💆 Spa & Wellness (9AM–8PM)\n🏋️ 24/7 Fitness Center\n🅿️ Free Underground Parking\n📶 Free High-Speed WiFi\n🛎️ 24/7 Concierge Service\n🍽️ Restaurant & Bar\n🎰 Business Center',
+      'Free WiFi in all areas! Network: "Skyland_Guest" — no password needed.',
+      'Infinity Pool on the 10th floor is perfect for relaxation. King\'s Room guests enjoy exclusive private pool access!'
     ]
   },
   {
     category: 'spa',
-    keywords: ['spa', 'massage', 'wellness', 'relax', 'treatment', 'therapy', 'facial', 'body'],
+    keywords: ['spa', 'massage', 'wellness', 'relax', 'treatment', 'therapy', 'body care'],
     responses: [
-      '💆 Spa & Wellness Services:\n\n⏰ Operating Hours: 9AM - 8PM\n📍 Location: 5th Floor\n\n💅 Available Services:\n• Swedish Massage (60 min): ₱1,500\n• Aromatherapy (45 min): ₱1,000\n• Facial Treatment (50 min): ₱1,200\n• Body Scrub (60 min): ₱1,300\n• Reflexology (30 min): ₱800\n\n📞 Book via Requests tab or call reception!',
-      'Spa Package Deals:\n🎁 Couple\'s Package: ₱2,500/person\n🎁 Relaxation Package: ₱2,800\n🎁 Premium Package: ₱5,000\n\n10% discount for first-time guests!\nBook 24 hours in advance for best availability.',
-      'Our Professional Therapists:\n✓ Certified & experienced\n✓ Use premium products only\n✓ Customized treatments\n✓ Clean & hygienic facilities\n✓ Confidential & private rooms\n\nRelax and rejuvenate your body & mind!'
+      '💆 Spa & Wellness Services:\n• Swedish Massage (60 min: ₱1,500)\n• Aromatherapy (45 min: ₱1,000)\n• Facial Treatments (50 min: ₱1,200)\n• Body Scrub (60 min: ₱1,300)\n\nOpen 9AM–8PM. Book in advance via the Requests tab or call reception!',
+      'Relax and rejuvenate! Our certified therapists use premium products. Special couple packages available.',
+      'First-time guest? Get 10% off your first spa service!'
     ]
   },
   {
     category: 'parking',
-    keywords: ['parking', 'car', 'vehicle', 'garage', 'valet', 'parking fee', 'park'],
+    keywords: ['parking', 'car', 'vehicle', 'garage', 'valet', 'drive'],
     responses: [
-      '🅿️ FREE Parking Available:\n\n✅ Underground Parking Facility\n✅ Climate-Controlled Environment\n✅ 24/7 Security Monitoring\n✅ CCTV Surveillance\n✅ Complimentary Valet Service\n✅ No Additional Charges\n\n📍 Let our team know your vehicle details at check-in!',
-      'Valet Parking Service (24/7):\n✓ Professional valet attendants\n✓ Safe vehicle handling\n✓ Quick access & retrieval\n✓ Secure storage\n✓ Complimentary service\n\nNotify reception for valet assistance anytime!',
-      'Guest Parking Info:\n📋 Underground garage\n🚗 Reserved spot for your stay\n🔒 Security gates & guards\n💨 Ventilated parking area\n🚙 Easy vehicle access\n\nNo worry about your vehicle! We\'ll take care of it.'
+      '🅿️ Free Parking Available!\n• Underground parking for all guests\n• Climate-controlled\n• 24/7 Security\n• Complimentary valet service\n\nNotify reception upon arrival for valet assistance.',
+      'Safe & secure parking included with your stay. No additional charges!',
+      'Valet parking available 24/7. Our team will take care of your vehicle.'
     ]
   },
   {
     category: 'requests',
-    keywords: ['request', 'help', 'assistance', 'support', 'need', 'help me', 'can you', 'i need', 'problem', 'issue'],
+    keywords: ['request', 'help', 'assistance', 'support', 'need', 'help me', 'can you', 'special request'],
     responses: [
-      '📝 Special Requests Available:\n\nCommon Requests:\n🛏️ Extra Bed/Cot\n🧴 Extra Towels/Toiletries\n🧹 Room Cleaning Service\n⏱️ Late Checkout\n🔑 Early Check-in\n🚗 Airport Transfer\n🗺️ Tour Arrangements\n🍽️ Dining Recommendations\n\n⚡ Response Time: Within 30 minutes!\nSubmit anytime in your dashboard.',
-      'How to Submit Requests:\n1. Go to "Requests" section\n2. Select request type\n3. Add description & details\n4. Submit request\n5. Get confirmation in 30 minutes\n\nOur team works 24/7 to help you!',
-      'Emergency Assistance Available:\n🚨 24/7 Front Desk\n☎️ Direct extension: 0\n🚑 Medical assistance\n🔧 Maintenance support\n🛡️ Security assistance\n\nWe\'re always here for you!'
+      '📝 Special Requests Available:\n• Extra Bed\n• Extra Towels\n• Room Cleaning\n• Late Checkout\n• Early Check-in\n• Airport Transfer\n• Tour Arrangements\n\nSubmit anytime in the Requests tab — our team responds within 30 minutes!',
+      'Our concierge team is ready to help! Submit your request and we\'ll arrange everything.',
+      'Something special needed? We\'ll do our best to accommodate! Use the Requests tab.'
     ]
   },
   {
     category: 'contact',
-    keywords: ['contact', 'phone', 'email', 'call', 'reach', 'support', 'help desk', 'telephone', 'number'],
+    keywords: ['contact', 'phone', 'email', 'call', 'reach', 'support', 'help desk', 'customer service'],
     responses: [
-      '📞 Contact Skyland Hotel:\n\n📱 Front Desk: +63 2 8000-1234\n📧 Email: reservations@skylandhotel.com\n💬 Live Chat: 24/7 via this bot\n🕐 Available: 24/7, 365 days/year\n\n⚡ Average Response Time:\n📧 Email: 1 hour\n📞 Phone: Immediate\n💬 Chat: 2-5 minutes',
-      'Reach Us By:\n✓ Phone (fastest)\n✓ Email (detailed inquiries)\n✓ Chat (quick questions)\n✓ In-person at front desk\n✓ Requests tab in dashboard\n\nWe respond to all inquiries within 1 hour!',
-      'Department Extensions:\n🛏️ Reservations: Ext. 101\n🍽️ Restaurant: Ext. 102\n💆 Spa & Wellness: Ext. 103\n🛎️ Concierge: Ext. 104\n👔 Guest Services: Ext. 105\n🔧 Maintenance: Ext. 0'
+      '📞 Contact Skyland Hotel:\n📱 Front Desk: +63 2 8000 1234\n📧 Email: reservations@skylandhotel.com\n💬 Chat: 24/7 via this bot\n🕐 Available 24/7, 365 days/year',
+      'Direct line to our team! We\'re always here to help.',
+      'Prefer email? reservations@skylandhotel.com — we respond within 1 hour.'
     ]
   },
   {
     category: 'cancellation',
-    keywords: ['cancel', 'cancellation', 'refund', 'policy', 'change', 'modify', 'reschedule'],
+    keywords: ['cancel', 'cancellation', 'refund', 'policy', 'cancel booking'],
     responses: [
-      '📋 Cancellation Policy:\n\n✅ 48+ hours before arrival:\nFULL REFUND (100%)\n\n⚠️ 24-48 hours before arrival:\nPARTIAL REFUND (50%)\n\n❌ Less than 24 hours:\nNO REFUND\n\n❌ No-show:\nFULL CHARGE (100%)\n\nManage bookings in "My Bookings" anytime!',
-      'How to Cancel/Reschedule:\n1. Go to "My Bookings"\n2. Select booking to modify\n3. Click "Cancel" or "Reschedule"\n4. Confirm changes\n5. Refund processed within 5 business days\n\nFree cancellation up to 48 hours!',
-      'Flexible Rebooking:\n✓ Change dates without penalty (48+ hours)\n✓ Transfer booking to another guest\n✓ Extend stay at discounted rates\n✓ Upgrade room type with fee\n\nContact us for special arrangements!'
+      '📋 Cancellation Policy:\n✅ 48+ hours before arrival: Full refund\n⚠️ 24-48 hours: 50% refund\n❌ Less than 24 hours: No refund\n❌ No-show: Full charge\n\nManage bookings in "My Bookings" section.',
+      'Need to cancel? Do it from your dashboard anytime. Free cancellation within 48 hours!',
+      'Modify your dates? You can reschedule without penalty up to 7 days before check-in.'
     ]
   },
   {
     category: 'reviews',
-    keywords: ['review', 'rating', 'feedback', 'experience', 'opinion', 'rate', 'comment', 'suggestion'],
+    keywords: ['review', 'rating', 'feedback', 'experience', 'opinion', 'rate us'],
     responses: [
-      '⭐ Your Feedback Matters!\n\nWe\'d love to hear about your stay!\n\n✍️ Share Your Experience:\n✓ Rate your stay (1-5 stars)\n✓ Write detailed feedback\n✓ Suggest improvements\n✓ Highlight best services\n✓ Upload photos\n\n🎁 Leave a review & get:\n• 10% discount on next booking\n• Loyalty points (100 pts)\n• Special surprise gifts!\n\nReview links sent after checkout.',
-      'Recent Guest Reviews:\n⭐⭐⭐⭐⭐ "Amazing service & beautiful rooms!"\n⭐⭐⭐⭐⭐ "Best hotel experience in the city!"\n⭐⭐⭐⭐⭐ "Friendly staff, clean rooms, highly recommended!"\n\nYour review could be featured next!\nShare your experience today!',
-      'Quality Assurance:\n📊 We monitor all feedback\n✅ Continuous improvements\n🎯 Staff training based on reviews\n💡 Implement guest suggestions\n🏆 Annual excellence awards\n\nYour opinion drives our excellence!'
+      '⭐ Love your stay? Share your feedback! Your reviews help us improve.',
+      'Your experience matters! Rate us after checkout and help future guests discover Skyland.',
+      'Had an issue? Please let us know so we can make it right!'
     ]
   },
   {
     category: 'loyalty',
-    keywords: ['loyalty', 'member', 'points', 'rewards', 'vip', 'discount', 'frequent', 'card'],
+    keywords: ['loyalty', 'member', 'points', 'rewards', 'vip', 'discount', 'frequent'],
     responses: [
-      '🎁 Skyland Loyalty Program:\n\n💎 Membership Benefits:\n✓ Earn 100 points per booking\n✓ 100 points = ₱500 discount\n✓ VIP members get 20% off\n✓ Exclusive rates for repeat guests\n✓ Birthday month special offers\n✓ Priority booking & upgrades\n\n🎉 Join FREE today!\nStart earning points now!',
-      'How Loyalty Points Work:\n1 night = 100 points earned\n5,000 points = Free 5-night stay\n10,000 points = Premium suite upgrade\n\nPoints never expire!\nRedeem anytime, no blackout dates.',
-      'VIP Member Perks:\n👑 20% discount on all stays\n🛏️ Automatic room upgrades\n🍽️ Free meals & drinks\n💆 Complimentary spa services\n🚗 Free airport transfers\n🎉 Exclusive member events'
+      '🎁 Loyalty Program:\n• Earn points on every booking\n• 100 points = ₱500 discount\n• VIP members get 20% off\n• Exclusive rates for repeat guests\n\nAsk about membership benefits!',
+      'Frequent visitor? Join our loyalty program for exclusive perks and discounts!',
+      'Earn points with every stay and redeem for future bookings!'
     ]
   },
   {
     category: 'greeting',
     keywords: ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening', 'welcome'],
     responses: [
-      'Hello! 👋 Welcome to Skyland Hotel!\n\nI\'m your AI assistant. I can help you with:\n✓ Room bookings & pricing\n✓ Restaurant & food ordering\n✓ Spa & wellness services\n✓ Hotel facilities & amenities\n✓ Special requests & assistance\n✓ Contact information\n\nWhat can I help you with today?',
-      'Hi there! 🏨 Welcome to Skyland Hotel Assistant!\n\nI\'m here to answer any questions about:\n🛏️ Accommodations\n🍽️ Dining\n💆 Wellness\n📞 Support\n\nFeel free to ask anything!',
-      'Welcome! 😊 Thanks for choosing Skyland Hotel!\n\nI\'m your 24/7 assistant. Ask me about:\n• Room availability & booking\n• Prices & special offers\n• Facilities & services\n• Restaurant menu\n• Travel tips & local info\n\nHow can I serve you today?'
+      'Hello! 👋 Welcome to Skyland Hotel! How can I assist you today?',
+      'Hi there! 🏨 I\'m your Skyland Hotel assistant. What can I help you with?',
+      'Welcome to Skyland! 😊 I\'m here 24/7. Ask me anything about bookings, dining, facilities, or your stay.'
     ]
   },
   {
     category: 'gratitude',
-    keywords: ['thank', 'thanks', 'appreciate', 'grateful', 'awesome', 'great', 'love', 'excellent'],
+    keywords: ['thank', 'thanks', 'appreciate', 'grateful', 'awesome', 'great', 'thank you'],
     responses: [
-      'You\'re welcome! 😊\n\nI\'m glad I could help! Is there anything else you\'d like to know about Skyland Hotel?\n\nWe\'re always here to make your stay special!',
-      'My pleasure! 🙏\n\nThank you for choosing Skyland Hotel. We appreciate your business!\n\nFeel free to ask if you need anything else.',
-      'Happy to help! ✨\n\nYour satisfaction is our priority. Enjoy your stay at Skyland Hotel!\n\nLet me know if you have more questions!'
+      'You\'re welcome! 😊 Happy to help. Is there anything else I can assist with?',
+      'My pleasure! Feel free to ask if you need anything else during your stay.',
+      'Glad I could help! Enjoy your time at Skyland Hotel! ✨'
     ]
   },
   {
     category: 'farewell',
-    keywords: ['bye', 'goodbye', 'see you', 'exit', 'close', 'that\'s all', 'farewell', 'take care'],
+    keywords: ['bye', 'goodbye', 'see you', 'exit', 'close', 'that\'s all', 'later'],
     responses: [
-      'Goodbye! 👋\n\nThank you for choosing Skyland Hotel!\nWe look forward to your visit! ✨\n\nSafe travels!',
-      'See you soon! 🏨\n\nThank you for chatting with us.\nWe hope to welcome you at Skyland Hotel!\n\nHave a wonderful day!',
-      'Take care! 😊\n\nWe appreciate your interest in Skyland Hotel.\nLooking forward to hosting you!\n\nGoodbye! 👋'
+      'Goodbye! 👋 We hope to see you soon at Skyland Hotel! ✨',
+      'Safe travels! Thank you for choosing Skyland Hotel.',
+      'Have a wonderful day! Looking forward to your next visit! 🏨'
+    ]
+  },
+  {
+    category: 'rooms',
+    keywords: ['normal room', 'suite room', 'deluxe', 'king room', 'room types', 'which room', 'difference'],
+    responses: [
+      '🛏️ Room Types:\n• Normal: Queen bed, AC, TV, WiFi (₱1,500)\n• Suite: City view, jacuzzi, minibar (₱3,500)\n• Deluxe: Balcony, smart TV, bathtub (₱2,800)\n• King: Private pool, butler, lounge (₱5,500)\n\nChoose what fits your needs!',
+      'Each room offers luxury comfort. Tell me your preferences and I\'ll recommend the best option!',
+      'All rooms include breakfast, WiFi, and access to all hotel facilities.'
+    ]
+  },
+  {
+    category: 'covid',
+    keywords: ['covid', 'vaccine', 'mask', 'sanitize', 'health', 'safety', 'protocol'],
+    responses: [
+      '🏥 Health & Safety:\n• Sanitized rooms between guests\n• Hand sanitizers available everywhere\n• Contactless check-in available\n• Staff fully vaccinated\n• Masks optional but recommended in common areas',
+      'Your safety is our priority! We follow all health guidelines strictly.',
+      'Please inform us of any health concerns upon arrival.'
+    ]
+  },
+  {
+    category: 'events',
+    keywords: ['event', 'meeting', 'conference', 'party', 'celebration', 'wedding', 'function'],
+    responses: [
+      '🎉 Event Spaces Available:\n• Conference Room (50 pax)\n• Ballroom (200+ pax)\n• Private Dining (30 pax)\n• Outdoor Terrace (100 pax)\n\nContact us for custom packages!',
+      'Planning an event? We can host conferences, weddings, parties, and more!',
+      'Let our events team create an unforgettable experience. Call or email us!'
     ]
   }
 ];
 
-// Get random response from category
+// Get a random response from a category
 function getRandomResponse(category) {
   const responses = category.responses || [];
   return responses[Math.floor(Math.random() * responses.length)] || 'How can I help you today?';
 }
 
-// Find matching category
+// Find matching category from user message
 function findMatchingCategory(userMessage) {
   const lowerMessage = userMessage.toLowerCase();
   
@@ -159,7 +187,7 @@ function findMatchingCategory(userMessage) {
   return null;
 }
 
-// POST: Handle chat messages
+// Chat message endpoint
 router.post('/message', (req, res) => {
   const { message } = req.body;
   
@@ -177,7 +205,8 @@ router.post('/message', (req, res) => {
     if (matchedCategory) {
       botReply = getRandomResponse(matchedCategory);
     } else {
-      botReply = '🤔 I\'m not quite sure about that.\n\nHere\'s what I can help with:\n• 🛏️ Room bookings & pricing\n• 🍽️ Restaurant & ordering\n• 💆 Spa & wellness\n• 🏊 Facilities & amenities\n• 📝 Special requests\n• 📞 Contact information\n\nOr reach our team directly:\n📱 +63 2 8000-1234\n📧 reservations@skylandhotel.com';
+      // Default response when no match found
+      botReply = 'I\'m not sure about that, but our team can help! 🤔\n\nYou can ask me about:\n• 🛏️ Room bookings & pricing\n• 🍽️ Restaurant & food orders\n• 💆 Spa & wellness\n• 🏊 Facilities & amenities\n• 📝 Special requests\n• 💬 Or chat with our team directly!\n\nReach us: +63 2 8000 1234 or reservations@skylandhotel.com';
     }
 
     res.json({ 
@@ -194,17 +223,29 @@ router.post('/message', (req, res) => {
   }
 });
 
-// GET: Chatbot info
+// Get chatbot info endpoint
 router.get('/info', (req, res) => {
   res.json({
     ok: true,
     bot: {
       name: '🤖 Skyland Assistant',
       availability: '24/7',
-      languages: ['English', 'Tagalog (coming soon)'],
-      capabilities: knowledgeBase.map(kb => kb.category)
+      languages: 'English, Tagalog',
+      capabilities: [
+        'Booking information',
+        'Room pricing',
+        'Facility details',
+        'Restaurant menu info',
+        'Special requests',
+        'General support'
+      ]
     }
   });
+});
+
+// Health check
+router.get('/health', (req, res) => {
+  res.json({ ok: true, status: 'Chatbot service running' });
 });
 
 module.exports = router;
