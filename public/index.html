@@ -9,7 +9,6 @@
   --primary-blue: #0a2f6c;
   --light-blue: #e6f0ff;
   --white: #ffffff;
-  --off-white: #f8fafc;
   --dark-blue: #041e3d;
   --gray: #4a5568;
   --border-light: #cbd5e1;
@@ -23,8 +22,8 @@
   box-sizing: border-box;
 }
 body {
-  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  background: var(--off-white);
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  background: var(--light-blue);
   color: var(--dark-blue);
   line-height: 1.5;
 }
@@ -35,7 +34,6 @@ body {
 .page.active {
   display: block;
 }
-/* Navbar */
 nav {
   background: var(--white);
   border-bottom: 1px solid var(--border-light);
@@ -65,7 +63,6 @@ nav {
   gap: 12px;
   align-items: center;
 }
-/* Buttons */
 .btn {
   padding: 8px 22px;
   border-radius: 40px;
@@ -113,7 +110,6 @@ nav {
   background: var(--success);
   color: white;
 }
-/* Hero */
 .hero {
   background: linear-gradient(135deg, var(--light-blue) 0%, white 100%);
   padding: 80px 32px 70px;
@@ -154,7 +150,6 @@ nav {
   font-size: 1.8rem;
   margin-bottom: 6px;
 }
-/* Auth card */
 .auth-wrap {
   display: flex;
   justify-content: center;
@@ -182,7 +177,6 @@ nav {
   margin-bottom: 28px;
   font-size: 0.9rem;
 }
-/* Form groups */
 .fg {
   margin-bottom: 20px;
 }
@@ -222,7 +216,6 @@ nav {
   font-weight: 600;
   text-decoration: none;
 }
-/* Dashboard */
 .dash {
   padding: 28px 32px;
   max-width: 1300px;
@@ -276,7 +269,6 @@ nav {
 .tab-content.active {
   display: block;
 }
-/* Room & menu cards */
 .rooms-grid, .menu-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -329,7 +321,6 @@ nav {
   font-size: 0.7rem;
   color: var(--primary-blue);
 }
-/* Bookings, requests */
 .bk-item, .req-card {
   background: white;
   border-radius: 24px;
@@ -348,11 +339,11 @@ nav {
   border-radius: 40px;
   font-size: 0.75rem;
   font-weight: 700;
+  display: inline-block;
 }
 .sb-pending { background: #fff3e0; color: #ed6c02; }
 .sb-confirmed { background: #e8f5e9; color: #2e7d32; }
 .sb-cancelled { background: #ffebee; color: #c62828; }
-/* Modal */
 .modal-ov {
   display: none;
   position: fixed;
@@ -383,7 +374,6 @@ nav {
   justify-content: flex-end;
   margin-top: 24px;
 }
-/* Chat widget */
 .chat-btn {
   position: fixed;
   bottom: 24px;
@@ -461,7 +451,6 @@ nav {
   border-radius: 40px;
   border: 1px solid var(--border-light);
 }
-/* Footer */
 footer {
   background: white;
   border-top: 1px solid var(--border-light);
@@ -498,6 +487,7 @@ footer {
 .toast.err { border-left-color: var(--error); }
 .empty { text-align: center; padding: 50px; color: var(--gray); }
 .chip { background: var(--light-blue); padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; }
+.small { font-size: 0.75rem; padding: 4px 12px; }
 @media (max-width: 700px) {
   .hero h1 { font-size: 2rem; }
   .dash { padding: 16px; }
@@ -750,7 +740,7 @@ function enterDash() {
   loadMenu();
   loadMyBookings();
 }
-// Room definitions (new)
+// Room definitions
 const roomCatalog = [
   { name: 'Budget Room', price: 725, desc: 'Fan room. Choose Twin/Double', icon: '🪭', tags: ['Fan','Twin/Double'] },
   { name: 'Standard Room', price: 875, desc: 'Aircon, TV. Twin/Double', icon: '❄️', tags: ['AC','TV'] },
@@ -805,6 +795,14 @@ document.getElementById('add-fridge')?.addEventListener('change', updateBookingT
 document.getElementById('add-extra-bed')?.addEventListener('change', updateBookingTotal);
 
 function closeModal() { document.getElementById('book-modal').classList.remove('open'); }
+
+// CHECK AVAILABILITY FUNCTION (4.1)
+async function checkAvailability(room, checkin, checkout) {
+  const res = await api('POST', '/api/check-availability', { room, checkin, checkout });
+  return res.available;
+}
+
+// CONFIRM BOOKING WITH AVAILABILITY CHECK (4.2)
 async function confirmBook() {
   const checkin = document.getElementById('bm-ci').value;
   const checkout = document.getElementById('bm-co').value;
@@ -813,22 +811,65 @@ async function confirmBook() {
   const fridge = document.getElementById('add-fridge').checked;
   const extra_bed = document.getElementById('add-extra-bed').checked;
   const special = document.getElementById('bm-special').value;
-  if(!checkin || !checkout) { toast('Select dates','err'); return; }
-  let total_price = bookRoomObj.price * (Math.round((new Date(checkout)-new Date(checkin))/86400000));
-  if(fridge) total_price += 200;
-  if(extra_bed) total_price += 200;
+  if (!checkin || !checkout) { toast('Select dates', 'err'); return; }
+  
+  // Check availability first
+  const available = await checkAvailability(bookRoomObj.name, checkin, checkout);
+  if (!available) {
+    toast('Sorry, this room is not available for the selected dates.', 'err');
+    return;
+  }
+  
+  let nights = Math.round((new Date(checkout) - new Date(checkin)) / 86400000);
+  let total_price = bookRoomObj.price * nights;
+  if (fridge) total_price += 200;
+  if (extra_bed) total_price += 200;
+  
   const payload = {
     room: bookRoomObj.name, price_per_night: bookRoomObj.price,
     checkin, checkout, guests, total_price,
     bed_type, fridge_requested: fridge, extra_bed_requested: extra_bed,
     special_request: special
   };
-  const r = await api('POST','/api/bookings', payload);
-  if(r.ok) { closeModal(); toast('Booking confirmed! 🎉'); loadMyBookings(); }
-  else toast(r.msg,'err');
+  const r = await api('POST', '/api/bookings', payload);
+  if (r.ok) { 
+    closeModal(); 
+    toast('Booking submitted for approval!'); 
+    loadMyBookings(); 
+  } else toast(r.msg, 'err');
 }
 
-// Menu, orders, bookings, requests (same as before, adjust endpoint names)
+// LOAD MY BOOKINGS WITH STATUS AND RECEIPT BUTTON (4.3)
+async function loadMyBookings() {
+  const r = await api('GET', '/api/bookings');
+  const el = document.getElementById('my-bookings');
+  if (!r.bookings || !r.bookings.length) {
+    el.innerHTML = '<div class="empty">📋 No bookings yet</div>';
+    return;
+  }
+  el.innerHTML = r.bookings.map(b => `
+    <div class="bk-item">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+        <h4 style="color:var(--primary-blue)">${b.room}</h4>
+        <span class="sb sb-${b.status.toLowerCase()}">${b.status}</span>
+      </div>
+      <div class="bk-grid">
+        <div><label>Check-in</label><p>${b.checkin}</p></div>
+        <div><label>Check-out</label><p>${b.checkout}</p></div>
+        <div><label>Guests</label><p>${b.guests}</p></div>
+        <div><label>Total</label><p>₱${Number(b.total_price).toLocaleString()}</p></div>
+      </div>
+      ${b.special_request ? `<p style="margin-top:8px">📝 ${b.special_request}</p>` : ''}
+      ${b.status === 'Confirmed' ? `<div style="margin-top:12px;"><button class="btn btn-outline small" onclick="downloadReceipt('${b._id}')">📄 Download Receipt (PDF)</button></div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function downloadReceipt(bookingId) {
+  window.open(`/api/admin/bookings/${bookingId}/receipt`, '_blank');
+}
+
+// Menu, orders, requests (same as before)
 async function loadMenu() {
   const r = await api('GET','/api/menu');
   const grid = document.getElementById('menu-items');
@@ -845,15 +886,6 @@ async function placeOrder() {
   const r=await api('POST','/api/orders',{item_name,quantity:qty,location:loc,note});
   if(r.ok){toast(r.msg); document.getElementById('o-note').value='';}
   else toast(r.msg,'err');
-}
-async function loadMyBookings() {
-  const r=await api('GET','/api/bookings');
-  const el=document.getElementById('my-bookings');
-  if(!r.bookings?.length) { el.innerHTML='<div class="empty">📋 No bookings yet</div>'; return; }
-  el.innerHTML=r.bookings.map(b=>`
-    <div class="bk-item"><div style="display:flex; justify-content:space-between"><h4 style="color:var(--primary-blue)">${b.room}</h4><span class="sb sb-${b.status?.toLowerCase()}">${b.status||'Pending'}</span></div>
-    <div class="bk-grid"><div><label>Check-in</label><p>${b.checkin}</p></div><div><label>Check-out</label><p>${b.checkout}</p></div><div><label>Guests</label><p>${b.guests}</p></div><div><label>Total</label><p>₱${b.total_price?.toLocaleString()}</p></div></div>
-    ${b.special_request?`<p style="margin-top:8px">📝 ${b.special_request}</p>`:''}</div>`).join('');
 }
 async function submitReq() {
   const type=document.getElementById('req-type').value;
