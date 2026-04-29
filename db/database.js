@@ -10,6 +10,7 @@ const db = {
   orders:   new Datastore({ filename: path.join(dbDir, 'orders.db'),   autoload: true }),
   requests: new Datastore({ filename: path.join(dbDir, 'requests.db'), autoload: true }),
   admins:   new Datastore({ filename: path.join(dbDir, 'admins.db'),   autoload: true }),
+  receipts: new Datastore({ filename: path.join(dbDir, 'receipts.db'), autoload: true }),
 };
 
 // Seed default admin
